@@ -2,7 +2,7 @@ A description of the project
 Pertinent documentation and usage write-up
 Pseudocode
 
-'''
+```
 def build_distance_matrix()
 
 Get all sequence IDs from the dictionary and count them (n)
@@ -82,6 +82,6 @@ Create new_labels using the remaining labels + new_node
 
 RETURN neighbor_joining(new_distances, new_labels)
 
-'''
+```
 Reflection narrative that describes what went right, what went wrong, what you didn't understand, how it could have been better, and how you could have been better.
 Appendix (AI usage, citations, etc.)
