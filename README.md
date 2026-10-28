@@ -27,7 +27,7 @@ conda activate module06
 
 
 ### Output
-The notebook displays a plot of the tree. The plot shows a root on the left since `Bio.Phylo` draws every tree as if it had a root on the left, even though neighbor joining never chose one, so the left to right order of splits means nothing. The y-axis is labeled with numbers, but that's just how the plot spaces out the labels, and it has no meaning. Only which sequences group together, and the horizontal branch lengths should be interpreted.
+The notebook displays a plot of the tree. The plot shows a root on the left since `Bio.Phylo` draws every tree as if it had a root on the left, even though neighbor joining never chose one, so the left-to-right order of splits means nothing. The y-axis is labeled with numbers, but that's just how the plot spaces out the labels, and it has no meaning. Only which sequences group together and the horizontal branch lengths should be interpreted.
 
 ## Pseudocode
 ### read_fasta
@@ -182,7 +182,14 @@ Something I really appreciated about this project was that I had more time to pl
 
 I still feel like I'm slower at coding than I'd like to be, even when I understand the concepts. But I think I'm getting better at working through problems without feeling like everything needs to be perfect from the beginning. Overall, I feel more confident discussing my code with other people, questioning my decisions, and explaining why I approached something a certain way. I think that's been one of the biggest improvements for me over these last few projects.
 
-### Other Members:
+### Other Members: Mara 
+Going into this project, I had only ever heard of Neighbor Joining as a vague concept in prior discussions of general phylogeny, so this was my first real introduction to it. The lecture was very confusing to me, but once provided the walkthrough, the process became much clearer, 
+and adjusting the Smith-Waterman algorithm to return normalized scores was a very simple task. Building the distance matrix using NumPy and indexing methods was straight forward as well, thanks to previous projects.
+I was able to create a logic flow for the Neighbor-Joining algorithm by following the walkthrough, but the actual implementation and use of recursion ended up being more complicated. 
+A point of confusion for me following the walkthrough was why they chose the final node joining at 3 nodes left instead of 2. My groupmates explained to me that stop condition of 3 nodes left is valid, but makes for a less detailed tree.  
+
+My groupmates and I were able to talk through the formulas we used and the decisions we made in order to come up with a combined approach for our final submission. I had originally used the "distance = 1-similarity" formula, but we ended up using the natural log, as it is more biologically relevant. 
+I do feel that I am getting better at reading other people's code and understanding why they chose the method they did. 
 
 ## Appendix (AI usage, citations, etc.)
 ### References:
