@@ -25,11 +25,11 @@ Install NumPy if needed:
 
     pip install numpy
 
-Open the project notebook (`project08MM.ipynb`) in Jupyter or VS Code and run the cells in order. The class definition must be run before the example cells.
+Open the project notebook (`project08.ipynb`) in PyCharm or VS Code and run the cells in order. The class definition must be run before the example cells.
 
 ### Running the project
 Create a model by passing the states, the observation symbols, and the three probability tables as NumPy arrays. The order of `states` must match the row order of every array, and the order of `observation_symbols` must match the column order of the emission array.
-
+```
     import numpy as np
 
     states = ["Island", "Genome"]            # row 0 = Island, row 1 = Genome
@@ -64,7 +64,7 @@ Output:
 
     ['Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome']
     -13.929108456051065
-
+```
 `viterbi()` returns the most probable path as a list of state names. The natural-log probability of that path is stored in `hmm.best_final_score`.
 
 ### Functions
@@ -87,30 +87,40 @@ Output:
 
 
 ### Output (Testing)
-# Example initial probabilities (probability of starting in each state)
+#### Example initial probabilities (probability of starting in each state)
+```
 states = ["Genome", "Island"]
 observations = ["A", "C", "G", "T"]
 init_probs = [0.2, 0.8]
-# "Island": 0.2, "Genome": 0.8
+```
+
+"Island": 0.2, "Genome": 0.8
 
 
-# Example transition probabilities (probability of moving from one state to another)
+#### Example transition probabilities (probability of moving from one state to another)
+```
 trans_probs = np.array([
     [0.7, 0.3],
     [0.1, 0.9]])
+```
 
-# "Island": {"I": 0.7, "G": 0.3}, "Genome": {"I": 0.1, "G": 0.9}
-# Example emission probabilities (probability of observing a symbol in a given state)
+"Island": {"I": 0.7, "G": 0.3}, "Genome": {"I": 0.1, "G": 0.9}
+
+
+#### Example emission probabilities (probability of observing a symbol in a given state)
+```
 emit_probs = np.array([
     [0.1, 0.4, 0.4, 0.1],
     [0.3, 0.2, 0.2, 0.3]
 ])
+```
 
-# "Island": {"A": 0.1, "C": 0.4, "G": 0.4, "T": 0.1},
-# "Genome": {"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3}
+"Island": {"A": 0.1, "C": 0.4, "G": 0.4, "T": 0.1},
+"Genome": {"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3}
 
 
-# Example observation sequence
+#### Example observation sequence
+```
 obs_seq = "GGCACTGAA"
 
 
@@ -125,6 +135,7 @@ hmm.observation_sequence = obs_seq
 result = hmm.viterbi()
 print(result)
 
+```
 
 ['Genome', 'Genome', 'Genome', 'Island', 'Island', 'Island', 'Island', 'Island', 'Island']
 
@@ -132,13 +143,12 @@ print(result)
 
 ## Pseudocode
 ### convert_to_log
-'''
+```
 Convert each probability array to log probability array; store as new attribute
-
-'''
+```
 
 ### initialization_viterbi
-'''
+```
 Get the number of hidden states and the length of the observation sequence
     # Rows = number of hidden states
     # Columns = length of observation sequence
@@ -153,27 +163,27 @@ Getting the first observation and its emission probability
 Calculation for first column of probabilities
     # initial probability from symbol, index + the first emission probability (remember we are in log, so its addition)
 Store in first column of the probability matrix
-'''
+```
 
 ### calculate_viterbi_score
-'''
+```
 Iterate through each observation
 iterate through each possible hidden state at that position
 calculate probabilities for each hidden state from previous state
 find the max
 Add that to emission probability and store 
 store the previous state that produced it for the traceback
-'''
+```
 
 ### termination_viterbi
-'''
+```
 Determine the last index of the observation sequence
 Determine the best final state
 Determine the best final probability
-'''
+```
 
 ### traceback_viterbi
-''' 
+``` 
 Initialize with the best final state
 Set current state equal to that
 iterate backwards through the observations
@@ -182,7 +192,7 @@ update current state to previous state
 add previous state into path
 iterate until start
 reverse the final order
-'''
+```
 
 
 ### Formulas
@@ -253,7 +263,7 @@ $$\pi_{i-1}^* = \text{ptr}_i(\pi_i^*)$$
 
 * Our model has no end state, so termination drops $a_{k0}$:
 
-$$P(x, \pi^*) = \max_k v_k(L), \qquad \pi_L^* = \arg\max_k v_k(L)$$
+$$P(x, \pi^{*}) = \max_k v_k(L), \qquad \pi_L^* = \arg\max_k v_k(L)$$
 
 * We are given initial probabilities directly, so column 1 is $v_k(1) = \pi_k \, e_k(x_1)$ and the recursion starts at $i = 2$.
 * To avoid underflow, we work in log space (max stays max; products become sums):
@@ -262,7 +272,7 @@ $$\log v_\ell(i) = \log e_\ell(x_i) + \max_k \big( \log v_k(i-1) + \log a_{k\ell
 
 ### Design Decisions
 
-## Sucesses
+## Successes
 
 ## Struggles
 
