@@ -13,7 +13,7 @@ The code is organized as a `HiddenMarkovModel` class so that later projects can 
 ### Setup
 Requirements:
 - Python 3
-- NumPy
+- NumPy(To be implemented Later)
 
 Clone the repository and switch to the project branch:
 
@@ -25,173 +25,222 @@ Install NumPy if needed:
 
     pip install numpy
 
-Open the project notebook (`project08.ipynb`) in PyCharm or VS Code and run the cells in order. The class definition must be run before the example cells.
-
 ### Running the project
-Create a model by passing the states, the observation symbols, and the three probability tables as NumPy arrays. The order of `states` must match the row order of every array, and the order of `observation_symbols` must match the column order of the emission array.
+Create a model from the three probability dictionaries, in the same format the project spec gives them. The states and the alphabet are read from the dictionary keys, so nothing needs to be listed separately.
+
+```python
+init_probs = {"I": 0.2, "G": 0.8}
+ 
+trans_probs = {"I": {"I": 0.7, "G": 0.3},      # trans_probs[from_state][to_state]
+               "G": {"I": 0.1, "G": 0.9}}
+ 
+emit_probs = {"I": {"A": 0.1, "C": 0.4, "G": 0.4, "T": 0.1},   # emit_probs[state][symbol]
+              "G": {"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3}}
+ 
+hmm = HiddenMarkovModel(init_probs, trans_probs, emit_probs)
+ 
+result = hmm.viterbi("GGCACTGAA")
+print(result["path"])
+print(result["log_probability"])
 ```
-    import numpy as np
-
-    states = ["Island", "Genome"]            # row 0 = Island, row 1 = Genome
-    observations = ["A", "C", "G", "T"]      # emission columns in this order
-
-    init_probs = np.array([0.2, 0.8])        # P(start in Island), P(start in Genome)
-
-    trans_probs = np.array([
-        [0.7, 0.3],                          # from Island: to Island, to Genome
-        [0.1, 0.9]                           # from Genome: to Island, to Genome
-    ])
-
-    emit_probs = np.array([
-        [0.1, 0.4, 0.4, 0.1],                # Island: A, C, G, T
-        [0.3, 0.2, 0.2, 0.3]                 # Genome: A, C, G, T
-    ])
-
-    hmm = HiddenMarkovModel(
-        states=states,
-        observation_symbols=observations,
-        initial_probability=init_probs,
-        transition_probability=trans_probs,
-        emission_probability=emit_probs
-    )
-
-    hmm.observation_sequence = "GGCACTGAA"
-    path = hmm.viterbi()
-    print(path)
-    print(hmm.best_final_score)
-
+ 
 Output:
-
-    ['Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome', 'Genome']
-    -13.929108456051065
+ 
+```
+['G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', 'G']
+-13.929108456051065
 ```
 
-`viterbi()` returns the most probable path as a list of state names. The natural-log probability of that path is stored in `hmm.best_final_score`.
+`viterbi()` takes a string or a list of symbols and returns a dict:
+ 
+| Key | What it holds |
+|---|---|
+| `"path"` | the most probable hidden state path, first position to last |
+| `"log_probability"` | natural log of the joint probability of that path and the observations |
+| `"score"` | the score table, one `{state: log score}` dict per position |
+| `"arrows"` | the traceback table, one `{state: previous state}` dict per position |
+ 
+A model that is not a valid HMM (mismatched keys, a row that does not sum to 1, a probability outside 0 to 1, an emission row missing a symbol) raises a `ValueError` when it is created. An empty sequence, or a symbol no state can emit, raises a `ValueError` when `viterbi()` is called:
+ 
+```python
+hmm.viterbi("GGNAC")
+# ValueError: No state can emit symbol N at position 2.
+```
 
 ### Functions
-- **`__init__(self, states, observation)_symbol,initial_probability,transition_probability, emission_probability)`**: Initialize objects used in HMM
-
-- **`convert_to_log(self)`**: Helper function to convert probabilities to log to avoid underflow
-
-- **`initialization_viterbi(self)`**:  Initialize stuff for probabilities and traceback matrix. Set up a probability matrix using the initial probabilities and the first observation. Initialize a traceback matrix for path reconstruction. No transition probs here
-
-- **`calculate_viterbi_score(self)`**: Function to calculate the maximum probabilities of each using the Viterbi algorithm. Max is for probability matrix. Argmax is for traceback matrix
-
-- **`termination_viterbi(self)`**: Function to determine the maximums
-
-- **`traceback_viterbi(self)`**: Set up traceback path for Viterbi algorithm for most-probable paths.
-
-- **`viterbi(self)`**: Function in which we call calculate_viterbi_score and traceback_viterbi to find the optimal path.
-
-
-
+`HMMSetup` (stores the model, checks it, builds the log tables)
+ 
+- **__init__(self, initial_probabilities, transition_probabilities, emission_probabilities)**: Stores the three dictionaries, reads `states` from the initial probabilities and `alphabet` from the emission rows, then calls `validate()` and `to_log_space()`.
+- **validate(self)**: Checks that every dictionary uses the same states, every emission row uses the same symbols, every probability is between 0 and 1, and every distribution sums to 1 (within 1e-6). Raises a `ValueError` naming the dictionary and state that failed.
+- **safe_log(self, p)**: Natural log of `p`, returning `-inf` when `p` is 0.
+- **to_log_space(self)**: Builds `log_init`, `log_trans`, and `log_emit` from the raw probabilities. Can be called again whenever the raw probabilities change.
+**ViterbiMixin** (adds Viterbi decoding, used through `HiddenMarkovModel`)
+ 
+- **initialization_viterbi(self, sequence)**: Creates the score and arrow tables and fills position 0 with log initial + log emission of the first symbol.
+- **calculate_viterbi_score(self, sequence)**: Fills positions 1 onward. For each state, keeps the best route from the previous position (max) and stores which state it came from (argmax), then adds the emission once.
+- **termination_viterbi(self)**: Finds the state with the highest score at the last position. Raises a `ValueError` if every path has probability 0.
+- **traceback_viterbi(self, final_state)**: Follows the arrows back from the final state and returns the path from first position to last.
+- **viterbi(self, sequence)**: Checks the sequence, runs the four steps above, and returns the result dict.
+**HiddenMarkovModel(HMMSetup, ViterbiMixin)**: Combines the two. This is the class you create.
 
 
-### Output (Testing)
-#### Example initial probabilities (probability of starting in each state)
+
+### Results and testing
+**Hand-calculated values.** Worked out on paper before writing code, using the spec's example parameters:
+ 
+| Observation | Expected | Notebook output |
+|---|---|---|
+| `"G"`, position 0 | I = log(0.2 × 0.4) = log(0.08), G = log(0.8 × 0.2) = log(0.16) | `{'I': -2.5257, 'G': -1.8326}` |
+| `"GG"`, position 1 | I = log(0.0224) from I, G = log(0.0288) from G | `{'I': -3.7987, 'G': -3.5474}`, arrows `{'I': 'I', 'G': 'G'}` |
+ 
+**Spec example (`"GGCACTGAA"`).** The best path stays in the background state `G` for all nine positions, with log probability -13.929. The GC-rich start looks like it might be an island, but the 0.8 starting probability and the 0.9 chance of staying in `G` make switching into `I` and back out too costly for such a short GC run.
+ 
+**Coin example (`"HHTT"`, fair vs loaded coin).** Path `['L', 'L', 'F', 'F']`, log probability -4.464.
+ 
+**Biased die example (Durbin et al., 1998).** Rolls `123666666121` give `Fair Fair Fair` followed by nine `Loaded`, log probability -20.488. The last three rolls (1, 2, 1) stay `Loaded` because switching back to `Fair` costs a 0.10 transition while staying costs 0.90, and three ordinary rolls are not enough evidence to pay for the switch.
+ 
+**Input checks.** Each of these raises a `ValueError` with a message naming what failed:
+ 
 ```
-states = ["Genome", "Island"]
-observations = ["A", "C", "G", "T"]
-init_probs = [0.2, 0.8]
+Caught: Transition row for I has states {'I', 'X'}, expected {'I', 'G'}
+Caught: Transition row for I sums to 0.8999999999999999, not 1
+Caught: Emission probability -0.1 of A in state I must be between 0 and 1
+Caught: Emission row for I has symbols {'C', 'A'}, expected {'G', 'C', 'A', 'T'}
 ```
-
-"Island": 0.2, "Genome": 0.8
-
-
-#### Example transition probabilities (probability of moving from one state to another)
-```
-trans_probs = np.array([
-    [0.7, 0.3],
-    [0.1, 0.9]])
-```
-
-"Island": {"I": 0.7, "G": 0.3}, "Genome": {"I": 0.1, "G": 0.9}
-
-#### Example emission probabilities (probability of observing a symbol in a given state)
-```
-emit_probs = np.array([
-    [0.1, 0.4, 0.4, 0.1],
-    [0.3, 0.2, 0.2, 0.3]
-])
-```
-
-"Island": {"A": 0.1, "C": 0.4, "G": 0.4, "T": 0.1},
-"Genome": {"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3}
-
-
-#### Example observation sequence
-```
-obs_seq = "GGCACTGAA"
-
-hmm = HiddenMarkovModel(
-    states=states,
-    observation_symbols=observations,
-    initial_probability=init_probs,
-    transition_probability=trans_probs,
-    emission_probability=emit_probs
-)
-hmm.observation_sequence = obs_seq
-result = hmm.viterbi()
-print(result)
-```
-
-['Genome', 'Genome', 'Genome', 'Island', 'Island', 'Island', 'Island', 'Island', 'Island']
+ 
+**What these tests do not cover yet:** the hand-calculated checks are printed and compared by eye rather than asserted, and only short sequences were checked against hand or brute-force answers.
 
 
 
 ## Pseudocode
-### convert_to_log
+### HMMSetup
+ 
+**`__init__`**
+ 
 ```
-Convert each probability array to log probability array; store as new attribute
-
+# store 3 probability dictionaries as attribute
+# states = list of keys of initial_probabilities
+# alphabet = every symbol that appears as a key in any emission row
+# call validate() to check inputs and raise an error if something is wrong
+# call to_log_space() to build log versions of the 3 tables
 ```
-
-### initialization_viterbi
+ 
+**`validate`**
+ 
 ```
-Get the number of hidden states and the length of the observation sequence
-    # Rows = number of hidden states
-    # Columns = length of observation sequence
-Initialize dimensions of both probability and traceback matrices
-    # viterbi_matrix = np.zeros((rows, columns))
-    # viterbi_traceback_matrix = np.zeros((rows, columns), dtype=int)
-Initialize the first column of the traceback with a character because there aren't previous states to the first state
-Getting the first observation and its emission probability
-    # Establish the first observation at index 0 for observation sequence
-    # Create a symbol index to get the probability for the symbol at observation sequence index 0
-    # Get the emission probabilities for all rows in column 1 at symbol index for that position in sequence
-Calculation for first column of probabilities
-    # initial probability from symbol, index + the first emission probability (remember we are in log, so its addition)
-Store in first column of the probability matrix
+# check that and raise a ValueError with a message showing what dict and state failed
+#   transition dict has the same state as initial (rows and columns)
+#   emission dict has the same states as initial (rows)
+#   every emission row has the same symbols as the alphabet        (added)
+#   initial probabilities sum to ~1
+#   each transition row sums to ~1
+#   each emission row sums to ~1
+#   every probability is between 0 and 1
 ```
-
-### calculate_viterbi_score
+ 
+**`safe_log`**
+ 
 ```
-Iterate through each observation
-iterate through each possible hidden state at that position
-calculate probabilities for each hidden state from previous state
-find the max
-Add that to emission probability and store 
-store the previous state that produced it for the traceback
+# (added) if p is 0:
+# (added)     return -inf (an impossible move or emission)
+# (added) otherwise:
+# (added)     return the natural log of p
 ```
-
-### termination_viterbi
+ 
+**`to_log_space`**
+ 
 ```
-Determine the last index of the observation sequence
-Determine the best final state
-Determine the best final probability
+#   build log versions of all 3 tables (self.log_init, self.log_trans, self.log_emit)
+#   handle log 0 = -inf
+#       if p = 0, store float('-inf') since a zero probability move is impossible
+#   (added) can be called again any time the raw probabilities change,
+#   (added) so the log tables never go stale (needed for Baum-Welch later)
 ```
-
-### traceback_viterbi
-``` 
-Initialize with the best final state
-Set current state equal to that
-iterate backwards through the observations
-look at previous state based on current state and position
-update current state to previous state
-add previous state into path
-iterate until start
-reverse the final order
+ 
+### ViterbiMixin
+ 
+**`initialization_viterbi`**
+ 
 ```
+#   create score grid: self.score[i][state] -> log score at position i, state
+#   create arrow grid: self.arrows[i][state] -> which previous state won the max
+#   fill only the first position (index 0, symbol = sequence[0]):
+#   for each state:
+#       score = log initial[state] + log emission[state][sequence[0]]
+#       arrow = None (no previous state yet)
+#   positions after are filled by calculate_viterbi_score
+```
+ 
+**`calculate_viterbi_score`**
+ 
+```
+#for each position i from 1 to len(sequence) - 1:
+#   symbol = sequence[i]
+#   score_column = empty dict
+#   arrow_column = empty dict
+#   for each current state:
+#       best_value = -inf
+#       best_previous = None
+#       for each previous state:
+#           candidate = self.score[i-1][previous] + log transition[previous][current]
+#           if candidate > best_value:
+#               best_value = candidate
+#               best_previous = previous
+#       score_column[current] = best_value + log emit[current][symbol]
+#       arrow_column[current] = best_previous
+#   append score column to self.score
+#   append arrow column to self.arrows
+```
+ 
+**`termination_viterbi`**
+ 
+```
+#   best_score = -inf
+#   best_state = none
+#   for state in last column of self.score (self.score[-1]):
+#       if self.score[-1][state] > best_score:
+#           best_score = self.score[-1][state]
+#           best_state = state
+#   if best_state is None, raise error (every path impossible)
+#   return best_state, best_score
+```
+ 
+**`traceback_viterbi`**
+ 
+```
+# path = [final_state]
+# current = final_state
+# for i from len(self.arrows) - 1 backwards to 1:
+#   current = self.arrows[i][current] #state at position i-1
+#   append current to path
+# reverse path
+# return path
+```
+ 
+**`viterbi`**
+ 
+```
+# if sequence is empty, raise ValueError
+# for each position and symbol in sequence:
+#   if no state has nonzero emission probability for a symbol
+#       raise ValueError that names the symbol and position
+# initialization_viterbi(sequence) #fills position 0
+# calculate_viterbi_score(sequence) #fills position 1 onward
+# best_state, best_score = termination_viterbi()
+# path = traceback_viterbi(best_state)
+# return {"path", "log_probability", "score", "arrows"}
+```
+ 
+### HiddenMarkovModel
+ 
+```
+# (added) combine HMMSetup and ViterbiMixin into one class
+# (added) HMMSetup gives it the stored model and log tables
+# (added) ViterbiMixin gives it the viterbi methods
+# (added) future projects add their mixin to this list, nothing else changes
+```
+ 
+---
 
 
 ### Formulas
@@ -271,6 +320,26 @@ $$\log v_\ell(i) = \log e_\ell(x_i) + \max_k \big( \log v_k(i-1) + \log a_{k\ell
 
 ### Design Decisions
 
+### Why the code is built this way
+ 
+**Dictionaries, keyed by state and symbol names.** The spec hands us the model as dictionaries, so we kept it that way all the way through. Every lookup reads like the math, for example `log_trans[previous][current]`, and because nothing depends on row numbers, a state label can never end up attached to the wrong row of numbers. One of our earlier array-based drafts had exactly that bug, where the output names were swapped and nothing crashed, so this was a deliberate choice. The tradeoff is speed: pure Python loops are slower than numpy, which only matters for very long sequences.
+
+**States and alphabet come from the dictionaries.** `states` is read from the keys of the initial probabilities and `alphabet` from the emission rows. Nothing is hard-coded, so the same class runs the CpG example, the coin example, and the biased die example without changes.
+
+
+**Validate before anything else.** `validate()` runs inside `__init__`, before the log tables are built. A bad model (a missing state, a row that does not sum to 1, a negative probability, an emission row missing a symbol) fails right away with a message naming the dictionary and state, instead of crashing somewhere in the middle of the recursion with a confusing `KeyError`.
+
+**A mixin structure.** The class is split into pieces so each project can add an algorithm without rewriting the earlier ones:
+ 
+| Class | Job |
+|---|---|
+| `HMMSetup` | stores the three dictionaries, validates them, builds the log tables |
+| `ViterbiMixin` | adds Viterbi decoding (Project 08) |
+| `HiddenMarkovModel` | combines them, and is the class you actually use |
+
+A mixin is a class that adds abilities to another class rather than standing on its own. `ViterbiMixin` cannot run by itself, since it relies on `self.states` and the log tables that `HMMSetup` creates. Python searches the classes in the order they are listed (`HiddenMarkovModel`, then `HMMSetup`, then `ViterbiMixin`), which is called the method resolution order. We picked mixins over making Viterbi a subclass of the HMM because Viterbi is something you do with an HMM, not a kind of HMM, and because it keeps each algorithm in its own notebook cell.
+
+## Sucesses
 ## Successes
 
 ## Struggles
@@ -282,11 +351,14 @@ Starting this project, I had somewhat of an understanding of the Viterbi algorit
 I used Claude to help walk me through examples of the Viterbi algorithm, which I felt really helped me understand what we were doing with this project. I also had it help me troubleshoot areas where I was stuck with the pseudocode, and I definitely found this project more difficult than past ones. Once we had the pseudocode, the Python was not too bad. 
 Since this project is the start of many others, we had to make sure that we prepared for that. This was definitely different than other projects because we didn't previously need to change things so they could be expanded upon, but this process seems to better represent what this process would look like in the real world. I am interested to see how this project will be expanded upon in the future modules and how we can add more algorithms to our HMM class.
 
+### Trivedi: 
+I’d actually worked with HMMs before, in BINF 6400 (Genomics) last semester, where we covered Viterbi, posterior decoding, and CpG island models, and built HMM classifiers for a problem set. So I came in thinking this would mostly be review, but it felt pretty different. There, the focus was on using HMMs and getting the math right for a specific problem. Here, there was no starter code at all, the model could have any number of states or symbols, and the code had to be designed so other algorithms could be added later. That meant I had to understand the algorithm well enough to build it from nothing, not just apply it. So before touching any code I worked through the first two columns of the Viterbi grid by hand with the spec’s example, and that ended up being the most useful thing I did all project. I kept getting stuck on small things, like using only the starting probabilities in column 1, or mixing up the state G with the nucleotide G, or thinking the emission decided the traceback.
 ### Other Members: Mara
 I was generally unfamiliar with HMMs going into this project, and did not have any experience with the Viterbi algorithm. Because we were given no background or template code like we usually would, I went ahead and compiled everything from the assignment and primer pages to "recreate" the way we normally do projects, which I think helped a lot. I also did the calculations by hand, although without converting to log, to double check the output. This project built off of the previous projects very nicely, particularly with the recursion and traceback. In my code version, I structured everything around numpy arrays for more efficient indexing, but struggled to do input data conversion, such as the provided examples being dictionaries. The indexing, while not necessarily hard, was difficult to keep track of, causing a lot of debugging towards the end. 
 
 This was also my first time future-proofing. It is much more difficult than I had originally anticipated because, without knowing what will need to be expanded in the next projects, it's hard knowing the best way to structure everything. Because we know the topic of the next projects, we had an idea of what to do, but without having learned it in class or seen the assignment yet, it was a challenge. My group mates and I were able to come up with insights into how to structure our code to accommodate this. 
 
+I also expected log space to change which route wins the max, but comparing the actual numbers showed it doesn’t, which is how we noticed the spec’s line about the max turning into a sum was wrong for Viterbi.
 ### Other Members: 
 
 
@@ -311,4 +383,6 @@ Studier, J. A., & Keppler, K. J. (1988). A note on the neighbor-joining algorith
 ### AI Usage
 Katelyn: I used Claude (Anthropic) throughout this project, mainly to understand the algorithm and check work. The group's main implementation was written by Mara. I used Claude to walk me through the Viterbi algorithm step by step, explain related concepts such as conditional independence and object-oriented programming, review and correct pseudocode and the formatting of the formulas for the notebook, guide me through writing a dictionary-based implementation by pointing out errors and giving me hints while I wrote most of the methods myself, test implementations against hand-checked examples to identify bugs and edge cases we missed, to draft the Setup and Running the Project sections of the README, and revise my Description section. 
 
+
+Trivedi: I used Claude(Anthropic) to help me understand calculation and assist me undersstanding how the viterbi traceback works. I asked claude how decorators and OOPs concept will help me keep my code more dyanmic and open to future changes. Claude also helped me write tests for the functions to confirm the expected output and calculation. I also revisted notes and materials from BINF6400 on HMM. 
 Mara: I used ChatGPT (OpenAI) to double check my indexing throughout the program and to establish my Class and initialization in such a way that I can add to it in the next projects. Prompt used: "Implementing the viterbi algorithm for HMM and checking me indexing through the numpy arrays. Do not write any code for me"
